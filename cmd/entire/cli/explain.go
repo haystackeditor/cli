@@ -368,6 +368,9 @@ func listCommittedForExplain(ctx context.Context, v1Store *checkpoint.GitStore, 
 		}
 		return v1Committed, nil
 	}
+	if v1Err != nil {
+		return nil, fmt.Errorf("listing checkpoints: %w", v1Err)
+	}
 
 	// Merge: start with v2, add v1-only entries so pre-v2 checkpoints
 	// remain visible during the transition period.
