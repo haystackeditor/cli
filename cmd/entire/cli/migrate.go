@@ -359,14 +359,18 @@ func copyTaskMetadataToV2(repo *git.Repository, _ *checkpoint.GitStore, v2Store 
 		return err
 	}
 
+	latestSessionIdx := -1
+	if len(summary.Sessions) > 0 {
+		latestSessionIdx = len(summary.Sessions) - 1
+	}
+
 	// Legacy v1 layout stores task metadata at checkpoint root: <cp>/tasks/<tool-use-id>/...
-	// Prefer attaching this tree to the latest session in v2.
-	if rootTasksTree, rootTasksErr := v1Tree.Tree("tasks"); rootTasksErr == nil {
-		if len(summary.Sessions) > 0 {
-			latestSessionIdx := len(summary.Sessions) - 1
-			if spliceErr := spliceTasksTreeToV2(repo, v2Store, cpID, latestSessionIdx, rootTasksTree.Hash); spliceErr != nil {
-				return fmt.Errorf("latest session task tree splice failed: %w", spliceErr)
-			}
+	// Attach this to the latest session in v2, and merge with that session's own tasks if present.
+	var rootTasksTree *object.Tree
+	rootTasksSpliced := false
+	if latestSessionIdx >= 0 {
+		if tasksTree, rootTasksErr := v1Tree.Tree("tasks"); rootTasksErr == nil {
+			rootTasksTree = tasksTree
 		}
 	}
 
@@ -382,8 +386,30 @@ func copyTaskMetadataToV2(repo *git.Repository, _ *checkpoint.GitStore, v2Store 
 			continue // No tasks directory in this session
 		}
 
-		if spliceErr := spliceTasksTreeToV2(repo, v2Store, cpID, sessionIdx, tasksTree.Hash); spliceErr != nil {
+		tasksTreeHash := tasksTree.Hash
+		if rootTasksTree != nil && sessionIdx == latestSessionIdx {
+			mergedTasksTreeHash, mergeErr := checkpoint.UpdateSubtree(
+				repo,
+				rootTasksTree.Hash,
+				nil,
+				tasksTree.Entries,
+				checkpoint.UpdateSubtreeOptions{MergeMode: checkpoint.MergeKeepExisting},
+			)
+			if mergeErr != nil {
+				return fmt.Errorf("failed to merge root and session task trees for session %d: %w", sessionIdx, mergeErr)
+			}
+			tasksTreeHash = mergedTasksTreeHash
+			rootTasksSpliced = true
+		}
+
+		if spliceErr := spliceTasksTreeToV2(repo, v2Store, cpID, sessionIdx, tasksTreeHash); spliceErr != nil {
 			return fmt.Errorf("session %d task tree splice failed: %w", sessionIdx, spliceErr)
+		}
+	}
+
+	if rootTasksTree != nil && !rootTasksSpliced {
+		if spliceErr := spliceTasksTreeToV2(repo, v2Store, cpID, latestSessionIdx, rootTasksTree.Hash); spliceErr != nil {
+			return fmt.Errorf("latest session task tree splice failed: %w", spliceErr)
 		}
 	}
 

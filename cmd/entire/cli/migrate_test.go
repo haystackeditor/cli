@@ -228,6 +228,52 @@ func TestMigrateCheckpointsV2_TaskCheckpoint(t *testing.T) {
 	require.NoError(t, taskFileErr, "expected migrated task checkpoint metadata in /full/current")
 }
 
+func TestMigrateCheckpointsV2_TaskMetadataMergesRootAndSessionTasks(t *testing.T) {
+	t.Parallel()
+	repo := initMigrateTestRepo(t)
+	v1Store, v2Store := newMigrateStores(repo)
+
+	cpID := id.MustCheckpointID("c1d2e3f4a5b6")
+
+	metadataDir := t.TempDir()
+	sessionTaskFile := filepath.Join(metadataDir, "tasks", "toolu_01SESSION", "checkpoint.json")
+	require.NoError(t, os.MkdirAll(filepath.Dir(sessionTaskFile), 0o755))
+	require.NoError(t, os.WriteFile(sessionTaskFile, []byte(`{"source":"session"}`), 0o644))
+
+	// Write one v1 task checkpoint that has both:
+	// 1) root-level task metadata (legacy layout, from IsTask/ToolUseID)
+	// 2) session-level task metadata (from MetadataDir copy into session subtree)
+	err := v1Store.WriteCommitted(context.Background(), checkpoint.WriteCommittedOptions{
+		CheckpointID: cpID,
+		SessionID:    "session-task-merge-001",
+		Strategy:     "manual-commit",
+		Transcript:   []byte("{\"type\":\"assistant\",\"message\":\"task merge\"}\n"),
+		Prompts:      []string{"task merge prompt"},
+		IsTask:       true,
+		ToolUseID:    "toolu_01ROOT",
+		MetadataDir:  metadataDir,
+		AuthorName:   "Test",
+		AuthorEmail:  "test@test.com",
+	})
+	require.NoError(t, err)
+
+	var stdout bytes.Buffer
+	result, migrateErr := migrateCheckpointsV2(context.Background(), repo, v1Store, v2Store, &stdout)
+	require.NoError(t, migrateErr)
+	assert.Equal(t, 1, result.migrated)
+
+	_, rootTreeHash, refErr := v2Store.GetRefState(plumbing.ReferenceName(paths.V2FullCurrentRefName))
+	require.NoError(t, refErr)
+	rootTree, treeErr := repo.TreeObject(rootTreeHash)
+	require.NoError(t, treeErr)
+
+	// Both root-level and per-session tasks must exist after migration.
+	_, rootTaskErr := rootTree.File(cpID.Path() + "/0/tasks/toolu_01ROOT/checkpoint.json")
+	require.NoError(t, rootTaskErr, "expected root-level task metadata in /full/current")
+	_, sessionTaskErr := rootTree.File(cpID.Path() + "/0/tasks/toolu_01SESSION/checkpoint.json")
+	require.NoError(t, sessionTaskErr, "expected session-level task metadata in /full/current")
+}
+
 func TestMigrateCheckpointsV2_AllSkippedOnRerun(t *testing.T) {
 	t.Parallel()
 	repo := initMigrateTestRepo(t)
