@@ -21,6 +21,7 @@ import (
 	"github.com/entireio/cli/cmd/entire/cli/jsonutil"
 	"github.com/entireio/cli/cmd/entire/cli/logging"
 	"github.com/entireio/cli/cmd/entire/cli/paths"
+	"github.com/entireio/cli/cmd/entire/cli/settings"
 	"github.com/entireio/cli/cmd/entire/cli/trailers"
 	"github.com/entireio/cli/cmd/entire/cli/validation"
 	"github.com/entireio/cli/cmd/entire/cli/versioninfo"
@@ -626,6 +627,13 @@ func aggregateTokenUsage(a, b *agent.TokenUsage) *agent.TokenUsage {
 // writeTranscript writes the transcript file from in-memory content or file path.
 // If the transcript exceeds MaxChunkSize, it's split into multiple chunk files.
 func (s *GitStore) writeTranscript(ctx context.Context, opts WriteCommittedOptions, basePath string, entries map[string]object.TreeEntry) error {
+	// When skip_raw_transcript is enabled, skip writing full.jsonl to save storage.
+	// Metadata, prompts, and compact transcripts are still committed.
+	if settings.IsSkipRawTranscriptEnabled(ctx) {
+		logging.Debug(ctx, "skipping raw transcript (skip_raw_transcript enabled)")
+		return nil
+	}
+
 	transcript := opts.Transcript
 	if len(transcript) == 0 && opts.TranscriptPath != "" {
 		var readErr error
