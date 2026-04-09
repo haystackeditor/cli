@@ -30,5 +30,4 @@ fi
 
 echo "Installed: $(entire --version)"
 echo ""
-echo "To enable transcript optimization, add to .entire/settings.json:"
-echo '  { "strategy_options": { "skip_raw_transcript": true } }'
+echo "Transcripts are automatically compacted before commit (full.jsonl ~30-200KB instead of ~7MB)."

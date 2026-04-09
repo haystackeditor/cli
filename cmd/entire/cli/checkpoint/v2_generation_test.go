@@ -218,7 +218,7 @@ func TestWriteCommittedFull_NoGenerationJSON(t *testing.T) {
 		SessionID:    "session-gen-001",
 		Strategy:     "manual-commit",
 		Agent:        agent.AgentTypeClaudeCode,
-		Transcript:   []byte(`{"type":"assistant","message":"hello"}`),
+		Transcript:   []byte(`{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"hello"}]}}` + "\n"),
 		AuthorName:   "Test",
 		AuthorEmail:  "test@test.com",
 	})
@@ -250,7 +250,7 @@ func TestUpdateCommitted_DoesNotAddGenerationJSON(t *testing.T) {
 		SessionID:    "session-noupdate-gen",
 		Strategy:     "manual-commit",
 		Agent:        agent.AgentTypeClaudeCode,
-		Transcript:   []byte(`{"type":"assistant","message":"initial"}`),
+		Transcript:   []byte(`{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"initial"}]}}` + "\n"),
 		Prompts:      []string{"first"},
 		AuthorName:   "Test",
 		AuthorEmail:  "test@test.com",
@@ -261,7 +261,7 @@ func TestUpdateCommitted_DoesNotAddGenerationJSON(t *testing.T) {
 	err = store.UpdateCommitted(ctx, UpdateCommittedOptions{
 		CheckpointID: cpID,
 		SessionID:    "session-noupdate-gen",
-		Transcript:   []byte(`{"type":"assistant","message":"finalized"}`),
+		Transcript:   []byte(`{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"finalized"}]}}` + "\n"),
 		Prompts:      []string{"first", "second"},
 		Agent:        agent.AgentTypeClaudeCode,
 	})

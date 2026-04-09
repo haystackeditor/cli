@@ -491,7 +491,7 @@ func TestV2GitStore_WriteCommittedFull_WritesTranscript(t *testing.T) {
 	ctx := context.Background()
 
 	cpID := id.MustCheckpointID("f1a2b3c4d5e6")
-	transcript := []byte(`{"type":"human","message":"hello"}` + "\n" + `{"type":"assistant","message":"hi"}`)
+	transcript := []byte(`{"type":"user","message":{"role":"user","content":"hello"}}` + "\n" + `{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"hi"}]}}` + "\n")
 
 	err := store.writeCommittedFullTranscript(ctx, WriteCommittedOptions{
 		CheckpointID: cpID,
@@ -507,9 +507,9 @@ func TestV2GitStore_WriteCommittedFull_WritesTranscript(t *testing.T) {
 	tree := v2FullTree(t, repo)
 	cpPath := cpID.Path()
 
-	// Transcript should exist at session subdirectory 0/
+	// Transcript should exist at session subdirectory 0/ (compacted format)
 	content := v2ReadFile(t, tree, cpPath+"/0/"+paths.TranscriptFileName)
-	assert.Contains(t, content, `"type":"human"`)
+	assert.Contains(t, content, `"type":"user"`)
 	assert.Contains(t, content, `"type":"assistant"`)
 }
 
@@ -749,7 +749,7 @@ func TestV2GitStore_UpdateCommitted_UpdatesBothRefs(t *testing.T) {
 		SessionID:    "test-session-update",
 		Strategy:     "manual-commit",
 		Agent:        agent.AgentTypeClaudeCode,
-		Transcript:   []byte(`{"type":"assistant","message":"initial"}`),
+		Transcript:   []byte(`{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"initial"}]}}` + "\n"),
 		Prompts:      []string{"first prompt"},
 		AuthorName:   "Test",
 		AuthorEmail:  "test@test.com",
@@ -760,7 +760,7 @@ func TestV2GitStore_UpdateCommitted_UpdatesBothRefs(t *testing.T) {
 	err = store.UpdateCommitted(ctx, UpdateCommittedOptions{
 		CheckpointID: cpID,
 		SessionID:    "test-session-update",
-		Transcript:   []byte(`{"type":"assistant","message":"finalized"}`),
+		Transcript:   []byte(`{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"finalized"}]}}` + "\n"),
 		Prompts:      []string{"first prompt", "second prompt"},
 		Agent:        agent.AgentTypeClaudeCode,
 	})
@@ -793,7 +793,7 @@ func TestV2GitStore_UpdateCommitted_NoTranscript_OnlyUpdatesMain(t *testing.T) {
 		CheckpointID: cpID,
 		SessionID:    "test-session-noupdate",
 		Strategy:     "manual-commit",
-		Transcript:   []byte(`{"type":"assistant","message":"original"}`),
+		Transcript:   []byte(`{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"original"}]}}` + "\n"),
 		Prompts:      []string{"old prompt"},
 		AuthorName:   "Test",
 		AuthorEmail:  "test@test.com",
