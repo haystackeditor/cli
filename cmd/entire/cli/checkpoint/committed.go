@@ -23,6 +23,7 @@ import (
 	"github.com/entireio/cli/cmd/entire/cli/paths"
 	"github.com/entireio/cli/cmd/entire/cli/settings"
 	"github.com/entireio/cli/cmd/entire/cli/trailers"
+	"github.com/entireio/cli/cmd/entire/cli/transcript/compact"
 	"github.com/entireio/cli/cmd/entire/cli/validation"
 	"github.com/entireio/cli/cmd/entire/cli/versioninfo"
 	"github.com/entireio/cli/redact"
@@ -651,6 +652,23 @@ func (s *GitStore) writeTranscript(ctx context.Context, opts WriteCommittedOptio
 	transcript, err := redact.JSONLBytes(transcript)
 	if err != nil {
 		return fmt.Errorf("failed to redact transcript secrets: %w", err)
+	}
+
+	// Compact the transcript to strip tool results and large payloads.
+	// This reduces full.jsonl from ~7MB to ~30-200KB while preserving
+	// user prompts, assistant text, and tool call names needed by
+	// downstream consumers (e.g. intent drift checker).
+	compacted, compactErr := compact.Compact(transcript, compact.MetadataFields{
+		Agent:      string(opts.Agent),
+		CLIVersion: versioninfo.Version,
+		StartLine:  opts.CheckpointTranscriptStart,
+	})
+	if compactErr != nil {
+		logging.Warn(ctx, "transcript compaction failed, writing raw transcript",
+			slog.String("error", compactErr.Error()),
+		)
+	} else if len(compacted) > 0 {
+		transcript = compacted
 	}
 
 	// Chunk the transcript if it's too large
@@ -1332,6 +1350,19 @@ func (s *GitStore) replaceTranscript(ctx context.Context, transcript []byte, age
 		if key == transcriptBase || strings.HasPrefix(key, transcriptBase+".") {
 			delete(entries, key)
 		}
+	}
+
+	// Compact the transcript before writing (matches writeTranscript behavior)
+	compacted, compactErr := compact.Compact(transcript, compact.MetadataFields{
+		Agent:      string(agentType),
+		CLIVersion: versioninfo.Version,
+	})
+	if compactErr != nil {
+		logging.Warn(ctx, "transcript compaction failed in replaceTranscript, writing raw transcript",
+			slog.String("error", compactErr.Error()),
+		)
+	} else if len(compacted) > 0 {
+		transcript = compacted
 	}
 
 	// Chunk the transcript (matches writeTranscript behavior)

@@ -2630,7 +2630,9 @@ func TestWriteCommitted_RedactsTranscriptSecrets(t *testing.T) {
 	store := NewGitStore(repo)
 	checkpointID := id.MustCheckpointID("aabbccddeef1")
 
-	transcript := []byte(`{"role":"assistant","content":"Here is your key: ` + highEntropySecret + `"}` + "\n")
+	// Use proper Claude Code JSONL format (type + message wrapper) so the
+	// transcript survives compaction — writeTranscript now compacts before writing.
+	transcript := []byte(`{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"Here is your key: ` + highEntropySecret + `"}]}}` + "\n")
 
 	err := store.WriteCommitted(context.Background(), WriteCommittedOptions{
 		CheckpointID:     checkpointID,

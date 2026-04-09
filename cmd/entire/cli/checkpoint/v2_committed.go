@@ -15,6 +15,7 @@ import (
 	"github.com/entireio/cli/cmd/entire/cli/jsonutil"
 	"github.com/entireio/cli/cmd/entire/cli/logging"
 	"github.com/entireio/cli/cmd/entire/cli/paths"
+	"github.com/entireio/cli/cmd/entire/cli/transcript/compact"
 	"github.com/entireio/cli/cmd/entire/cli/validation"
 	"github.com/entireio/cli/cmd/entire/cli/versioninfo"
 	"github.com/entireio/cli/redact"
@@ -535,6 +536,19 @@ func (s *V2GitStore) writeTranscriptBlobs(ctx context.Context, transcript []byte
 	redacted, err := redact.JSONLBytes(transcript)
 	if err != nil {
 		return nil, fmt.Errorf("failed to redact transcript: %w", err)
+	}
+
+	// Compact the transcript to strip tool results and large payloads.
+	compacted, compactErr := compact.Compact(redacted, compact.MetadataFields{
+		Agent:      string(agentType),
+		CLIVersion: versioninfo.Version,
+	})
+	if compactErr != nil {
+		logging.Warn(ctx, "transcript compaction failed in v2 writeTranscriptBlobs, writing raw transcript",
+			slog.String("error", compactErr.Error()),
+		)
+	} else if len(compacted) > 0 {
+		redacted = compacted
 	}
 
 	chunks, err := agent.ChunkTranscript(ctx, redacted, agentType)
