@@ -420,16 +420,6 @@ func IsPushV2RefsEnabled(ctx context.Context) bool {
 	return s.IsPushV2RefsEnabled()
 }
 
-// IsSkipRawTranscriptEnabled checks if raw transcript exclusion is enabled.
-// Returns false by default if settings cannot be loaded or the key is missing.
-func IsSkipRawTranscriptEnabled(ctx context.Context) bool {
-	settings, err := Load(ctx)
-	if err != nil {
-		return false
-	}
-	return settings.IsSkipRawTranscript()
-}
-
 // IsSummarizeEnabled checks if auto-summarize is enabled in settings.
 // Returns false by default if settings cannot be loaded or the key is missing.
 func IsSummarizeEnabled(ctx context.Context) bool {
@@ -542,14 +532,6 @@ func (s *EntireSettings) IsPushSessionsDisabled() bool {
 // from v1 checkpoint commits. When true, only metadata, prompts, and compact
 // transcripts are committed — saving significant storage for large sessions.
 // Returns false by default (raw transcripts are included).
-func (s *EntireSettings) IsSkipRawTranscript() bool {
-	if s.StrategyOptions == nil {
-		return false
-	}
-	val, ok := s.StrategyOptions["skip_raw_transcript"].(bool)
-	return ok && val
-}
-
 // IsExternalAgentsEnabled checks if external agent discovery is enabled in settings.
 // Returns false by default if settings cannot be loaded or the key is missing.
 func IsExternalAgentsEnabled(ctx context.Context) bool {
