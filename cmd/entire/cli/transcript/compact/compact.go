@@ -639,7 +639,9 @@ func stripAssistantContent(contentRaw json.RawMessage) json.RawMessage {
 			copyField(stripped, block, "type")
 			copyField(stripped, block, "id")
 			copyField(stripped, block, "name")
-			copyField(stripped, block, "input")
+			if in, ok := block["input"]; ok {
+				stripped["input"] = truncateInputStrings(in)
+			}
 			result = append(result, stripped)
 			continue
 		}

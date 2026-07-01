@@ -660,14 +660,20 @@ func (s *GitStore) writeTranscript(ctx context.Context, opts WriteCommittedOptio
 		// tens of MB (Edit tool results embed whole files) and would
 		// permanently bloat the entire/checkpoints/v1 branch. Fall back to a
 		// bounded, best-effort strip instead.
+		fallback := compact.SafeFallback(transcript)
 		if compactErr != nil {
 			logging.Warn(ctx, "transcript compaction failed, writing bounded fallback",
 				slog.String("error", compactErr.Error()),
+				slog.Int("raw_bytes", len(transcript)),
+				slog.Int("fallback_bytes", len(fallback)),
 			)
 		} else {
-			logging.Warn(ctx, "transcript compaction produced empty output, writing bounded fallback")
+			logging.Warn(ctx, "transcript compaction produced empty output, writing bounded fallback",
+				slog.Int("raw_bytes", len(transcript)),
+				slog.Int("fallback_bytes", len(fallback)),
+			)
 		}
-		transcript = compact.SafeFallback(transcript)
+		transcript = fallback
 	} else {
 		transcript = compacted
 	}
@@ -1362,14 +1368,20 @@ func (s *GitStore) replaceTranscript(ctx context.Context, transcript []byte, age
 		// Never write the full raw transcript here (see writeTranscript): fall
 		// back to a bounded, best-effort strip so a compaction failure can't
 		// bloat the entire/checkpoints/v1 branch.
+		fallback := compact.SafeFallback(transcript)
 		if compactErr != nil {
 			logging.Warn(ctx, "transcript compaction failed in replaceTranscript, writing bounded fallback",
 				slog.String("error", compactErr.Error()),
+				slog.Int("raw_bytes", len(transcript)),
+				slog.Int("fallback_bytes", len(fallback)),
 			)
 		} else {
-			logging.Warn(ctx, "transcript compaction produced empty output in replaceTranscript, writing bounded fallback")
+			logging.Warn(ctx, "transcript compaction produced empty output in replaceTranscript, writing bounded fallback",
+				slog.Int("raw_bytes", len(transcript)),
+				slog.Int("fallback_bytes", len(fallback)),
+			)
 		}
-		transcript = compact.SafeFallback(transcript)
+		transcript = fallback
 	} else {
 		transcript = compacted
 	}
