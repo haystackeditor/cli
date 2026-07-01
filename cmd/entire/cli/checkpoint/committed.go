@@ -655,11 +655,20 @@ func (s *GitStore) writeTranscript(ctx context.Context, opts WriteCommittedOptio
 		CLIVersion: versioninfo.Version,
 		StartLine:  opts.CheckpointTranscriptStart,
 	})
-	if compactErr != nil {
-		logging.Warn(ctx, "transcript compaction failed, writing raw transcript",
-			slog.String("error", compactErr.Error()),
-		)
-	} else if len(compacted) > 0 {
+	if compactErr != nil || len(compacted) == 0 {
+		// Never write the full raw transcript here: a single session can be
+		// tens of MB (Edit tool results embed whole files) and would
+		// permanently bloat the entire/checkpoints/v1 branch. Fall back to a
+		// bounded, best-effort strip instead.
+		if compactErr != nil {
+			logging.Warn(ctx, "transcript compaction failed, writing bounded fallback",
+				slog.String("error", compactErr.Error()),
+			)
+		} else {
+			logging.Warn(ctx, "transcript compaction produced empty output, writing bounded fallback")
+		}
+		transcript = compact.SafeFallback(transcript)
+	} else {
 		transcript = compacted
 	}
 
@@ -1349,11 +1358,19 @@ func (s *GitStore) replaceTranscript(ctx context.Context, transcript []byte, age
 		Agent:      string(agentType),
 		CLIVersion: versioninfo.Version,
 	})
-	if compactErr != nil {
-		logging.Warn(ctx, "transcript compaction failed in replaceTranscript, writing raw transcript",
-			slog.String("error", compactErr.Error()),
-		)
-	} else if len(compacted) > 0 {
+	if compactErr != nil || len(compacted) == 0 {
+		// Never write the full raw transcript here (see writeTranscript): fall
+		// back to a bounded, best-effort strip so a compaction failure can't
+		// bloat the entire/checkpoints/v1 branch.
+		if compactErr != nil {
+			logging.Warn(ctx, "transcript compaction failed in replaceTranscript, writing bounded fallback",
+				slog.String("error", compactErr.Error()),
+			)
+		} else {
+			logging.Warn(ctx, "transcript compaction produced empty output in replaceTranscript, writing bounded fallback")
+		}
+		transcript = compact.SafeFallback(transcript)
+	} else {
 		transcript = compacted
 	}
 
